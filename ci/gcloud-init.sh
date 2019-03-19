@@ -20,8 +20,8 @@ provisionerId=releng-hardware
 GITHUB_HEAD_SHA=`git rev-parse HEAD`
 deploymentId=${GITHUB_HEAD_SHA:0:12}
 
-#instanceType=n1-standard-8
-instanceType=n1-highcpu-96
+instanceCpuCount=96
+instanceType=n1-highcpu-${instanceCpuCount}
 
 if which xdg-open > /dev/null; then
   xdg-open "https://console.cloud.google.com/compute/instances?authuser=1&folder&organizationId&project=windows-workers&instancessize=50&duration=PT1H&pli=1&instancessort=zoneForFilter%252Cname"
@@ -31,8 +31,15 @@ echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deploy
 
 # spawn 5 instances
 for i in {1..5}; do
-  # pick a random zone
+  # pick a random zone that has region cpu quota (minus usage) higher than required instanceCpuCount
   zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
+  cpuQuota=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
+  cpuUsage=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
+  while (( (cpuQuota - cpuUsage) < instanceCpuCount )); do
+    zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
+    cpuQuota=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
+    cpuUsage=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
+  done
   # generate a random instance name which does not pre-exist
   existing_instance_uri_list=(`gcloud compute instances list --uri`)
   existing_instance_name_list=("${existing_instance_uri_list[@]##*/}")
