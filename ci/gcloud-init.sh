@@ -14,6 +14,10 @@ livelogSecret=`pass Mozilla/TaskCluster/livelogSecret`
 livelogcrt=`pass Mozilla/TaskCluster/livelogCert`
 livelogkey=`pass Mozilla/TaskCluster/livelogKey`
 pgpKey=`pass Mozilla/OpenCloudConfig/rootGpgKey`
+provisionerId=releng-hardware
+workerGroup=gcp
+GITHUB_HEAD_SHA=`git rev-parse HEAD`
+deploymentId=${GITHUB_HEAD_SHA:0:12}
 
 for zone_name in ${zone_name_list[@]}; do
   # generate a random instance name which does not pre-exist
@@ -34,7 +38,7 @@ for zone_name in ${zone_name_list[@]}; do
     --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=gecko-1-b-win2012-gamma;sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt}" \
     --zone ${zone_name}
   publicIP=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.networkInterfaces[0].accessConfigs[0].natIP')
-  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId' | sed 's/\"/\\\"/g'`"
+  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${workerGroup} --arg deploymentId ${deploymentId} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .workerTypeMetadata.config.deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
   gcloud compute instances add-metadata ${instance_name} --zone ${zone_name} --metadata "^;^gwConfig=${gwConfig}"
   gcloud beta compute disks create ${instance_name}-disk-1 --size 120 --type pd-ssd --physical-block-size 4096 --zone ${zone_name}
   gcloud compute instances attach-disk ${instance_name} --disk ${instance_name}-disk-1 --zone ${zone_name}
