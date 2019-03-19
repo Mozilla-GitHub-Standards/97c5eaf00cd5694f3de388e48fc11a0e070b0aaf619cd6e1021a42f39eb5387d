@@ -1569,6 +1569,14 @@
       ],
       "Source": "http://169.254.169.254/computeMetadata/v1beta1/instance/attributes/occInstallersToken",
       "Target": "C:\\builds\\occ-installers.tok"
+    },
+    {
+      "ComponentName": "EnablePerformanceCounters",
+      "ComponentType": "CommandRun",
+      "Command": "diskperf.exe",
+      "Arguments": [
+        "-y"
+      ]
     }
   ],
   "ProvisionerConfiguration": {
