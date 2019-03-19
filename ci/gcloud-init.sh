@@ -33,12 +33,13 @@ echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deploy
 for i in {1..5}; do
   # pick a random zone that has region cpu quota (minus usage) higher than required instanceCpuCount
   zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
-  cpuQuota=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
-  cpuUsage=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
+  region=${zone_name::-2}
+  cpuQuota=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
+  cpuUsage=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
   while (( (cpuQuota - cpuUsage) < instanceCpuCount )); do
     zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
-    cpuQuota=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
-    cpuUsage=$(gcloud compute regions describe ${zone_name::-2} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
+    cpuQuota=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
+    cpuUsage=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
   done
   # generate a random instance name which does not pre-exist
   existing_instance_uri_list=(`gcloud compute instances list --uri`)
@@ -47,12 +48,11 @@ for i in {1..5}; do
   while [[ " ${existing_instance_name_list[@]} " =~ " ${instance_name} " ]]; do
     instance_name=${names_first[$[$RANDOM % ${#names_first[@]}]]}-${names_middle[$[$RANDOM % ${#names_middle[@]}]]}-${names_last[$[$RANDOM % ${#names_last[@]}]]}
   done
-  workerGroup=${zone_name::-2}
 
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance name: $(tput bold)${instance_name}$(tput sgr0)"
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) zone name: $(tput bold)${zone_name}$(tput sgr0)"
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance type: $(tput bold)${instanceType}$(tput sgr0)"
-  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) worker group: $(tput bold)${workerGroup}$(tput sgr0)"
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) worker group: $(tput bold)${region}$(tput sgr0)"
 
   gcloud compute instances create ${instance_name} \
     --image-project windows-cloud \
@@ -67,7 +67,7 @@ for i in {1..5}; do
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) public ip: $(tput bold)${publicIP}$(tput sgr0)"
   instanceId=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.id')
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance id: $(tput bold)${instanceId}$(tput sgr0)"
-  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${workerGroup} --arg deploymentId ${deploymentId} --arg availabilityZone ${zone_name} --arg instanceId ${instanceId} --arg instanceType ${instanceType} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
+  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${region} --arg deploymentId ${deploymentId} --arg availabilityZone ${zone_name} --arg instanceId ${instanceId} --arg instanceType ${instanceType} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
   gcloud compute instances add-metadata ${instance_name} --zone ${zone_name} --metadata "^;^gwConfig=${gwConfig}"
   gcloud beta compute disks create ${instance_name}-disk-1 --size 120 --type pd-ssd --physical-block-size 4096 --zone ${zone_name}
   gcloud compute instances attach-disk ${instance_name} --disk ${instance_name}-disk-1 --zone ${zone_name}
