@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+script_name=$(basename ${0##*/} .sh)
 names_first=(`jq -r '.unicorn.first[]' ${script_dir}/names.json`)
 names_middle=(`jq -r '.unicorn.middle[]' ${script_dir}/names.json`)
 names_last=(`jq -r '.unicorn.last[]' ${script_dir}/names.json`)
@@ -14,10 +15,19 @@ livelogSecret=`pass Mozilla/TaskCluster/livelogSecret`
 livelogcrt=`pass Mozilla/TaskCluster/livelogCert`
 livelogkey=`pass Mozilla/TaskCluster/livelogKey`
 pgpKey=`pass Mozilla/OpenCloudConfig/rootGpgKey`
+relengapiToken=`pass Mozilla/OpenCloudConfig/tooltool-relengapi-tok`
+occInstallersToken=`pass Mozilla/OpenCloudConfig/tooltool-occ-installers-tok`
 provisionerId=releng-hardware
 workerGroup=gcp
 GITHUB_HEAD_SHA=`git rev-parse HEAD`
 deploymentId=${GITHUB_HEAD_SHA:0:12}
+instanceType=n1-standard-8
+
+if which xdg-open > /dev/null; then
+  xdg-open "https://console.cloud.google.com/compute/instances?authuser=1&folder&organizationId&project=windows-workers&instancessize=50&duration=PT1H&pli=1&instancessort=zoneForFilter%252Cname"
+fi
+
+echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deployment id: $(tput bold)${deploymentId}$(tput sgr0)"
 
 for zone_name in ${zone_name_list[@]}; do
   # generate a random instance name which does not pre-exist
@@ -27,19 +37,29 @@ for zone_name in ${zone_name_list[@]}; do
   while [[ " ${existing_instance_name_list[@]} " =~ " ${instance_name} " ]]; do
     instance_name=${names_first[$[$RANDOM % ${#names_first[@]}]]}-${names_middle[$[$RANDOM % ${#names_middle[@]}]]}-${names_last[$[$RANDOM % ${#names_last[@]}]]}
   done
-  echo "spawning ${instance_name} in ${zone_name}"
+
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance name: $(tput bold)${instance_name}$(tput sgr0)"
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) zone name: $(tput bold)${zone_name}$(tput sgr0)"
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance type: $(tput bold)${instanceType}$(tput sgr0)"
+
   gcloud compute instances create ${instance_name} \
     --image-project windows-cloud \
     --image-family windows-2012-r2 \
-    --machine-type n1-standard-8 \
+    --machine-type ${instanceType} \
     --boot-disk-size 120 \
     --boot-disk-type pd-ssd \
     --scopes storage-ro \
-    --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=gecko-1-b-win2012-gamma;sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt}" \
+    --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=gecko-1-b-win2012-gamma;sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt};relengapiToken=${relengapiToken};occInstallersToken=${occInstallersToken}" \
     --zone ${zone_name}
   publicIP=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.networkInterfaces[0].accessConfigs[0].natIP')
-  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${workerGroup} --arg deploymentId ${deploymentId} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .workerTypeMetadata.config.deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) public ip: $(tput bold)${publicIP}$(tput sgr0)"
+  instanceId=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.id')
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance id: $(tput bold)${instanceId}$(tput sgr0)"
+  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${workerGroup} --arg deploymentId ${deploymentId} --arg availabilityZone ${zone_name} --arg instanceId ${instanceId} --arg instanceType ${instanceType} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
   gcloud compute instances add-metadata ${instance_name} --zone ${zone_name} --metadata "^;^gwConfig=${gwConfig}"
   gcloud beta compute disks create ${instance_name}-disk-1 --size 120 --type pd-ssd --physical-block-size 4096 --zone ${zone_name}
   gcloud compute instances attach-disk ${instance_name} --disk ${instance_name}-disk-1 --zone ${zone_name}
 done
+
+# open the firewall to livelog traffic
+# gcloud compute firewall-rules create livelog-direct --allow tcp:60023 --description "allows connections to livelog GET interface, running on taskcluster worker instances"

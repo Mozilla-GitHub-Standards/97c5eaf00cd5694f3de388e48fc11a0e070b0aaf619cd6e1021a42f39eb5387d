@@ -851,6 +851,11 @@
       "Path": "Y:\\tooltool_cache"
     },
     {
+      "ComponentName": "dir_Builds",
+      "ComponentType": "DirectoryCreate",
+      "Path": "C:\\builds"
+    },
+    {
       "ComponentName": "env_TOOLTOOL_CACHE",
       "ComponentType": "EnvironmentVariableSet",
       "Comment": "Tells the build system where to find the local tooltool cache",
@@ -874,6 +879,10 @@
         {
           "ComponentType": "DirectoryCreate",
           "ComponentName": "dir_TOOLTOOL_CACHE"
+        },
+        {
+          "ComponentType": "DirectoryCreate",
+          "ComponentName": "dir_Builds"
         }
       ]
     },
@@ -1536,6 +1545,30 @@
           "ComponentName": "HostsFile"
         }
       ]
+    },
+    {
+      "ComponentName": "releng_api_token",
+      "ComponentType": "FileDownload",
+      "DependsOn": [
+        {
+          "ComponentType": "DirectoryCreate",
+          "ComponentName": "dir_Builds"
+        }
+      ],
+      "Source": "http://169.254.169.254/computeMetadata/v1beta1/instance/attributes/relengapiToken",
+      "Target": "C:\\builds\\relengapi.tok"
+    },
+    {
+      "ComponentName": "occ_installers_token",
+      "ComponentType": "FileDownload",
+      "DependsOn": [
+        {
+          "ComponentType": "DirectoryCreate",
+          "ComponentName": "dir_Builds"
+        }
+      ],
+      "Source": "http://169.254.169.254/computeMetadata/v1beta1/instance/attributes/occInstallersToken",
+      "Target": "C:\\builds\\occ-installers.tok"
     }
   ],
   "ProvisionerConfiguration": {

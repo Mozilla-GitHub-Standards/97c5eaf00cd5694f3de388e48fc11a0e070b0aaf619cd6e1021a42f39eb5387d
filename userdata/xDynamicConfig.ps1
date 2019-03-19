@@ -22,7 +22,7 @@ Configuration xDynamicConfig {
     $locationType = 'DataCenter'
   }
 
-  if ($locationType -ne 'DataCenter') {
+  if ($locationType -eq 'AWS') {
     Script GpgKeyImport {
       DependsOn = @('[Script]ExeInstall_GpgForWin')
       GetScript = { @{ Result = (((Test-Path -Path ('{0}\SysWOW64\config\systemprofile\AppData\Roaming\gnupg\secring.gpg' -f $env:SystemRoot) -ErrorAction SilentlyContinue) -and ((Get-Item ('{0}\SysWOW64\config\systemprofile\AppData\Roaming\gnupg\secring.gpg' -f $env:SystemRoot)).length -gt 0kb)) -or ((Test-Path -Path ('{0}\System32\config\systemprofile\AppData\Roaming\gnupg\secring.gpg' -f $env:SystemRoot) -ErrorAction SilentlyContinue) -and ((Get-Item ('{0}\System32\config\systemprofile\AppData\Roaming\gnupg\secring.gpg' -f $env:SystemRoot)).length -gt 0kb))) } }
@@ -33,11 +33,7 @@ Configuration xDynamicConfig {
           $gpg = ('{0}\GNU\GnuPG\pub\gpg.exe' -f $env:ProgramFiles)
         }
         try {
-          if ($locationType -eq 'AWS') {
-            $gpgPrivateKey = [regex]::matches((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/user-data'), '(?s)-----BEGIN PGP PRIVATE KEY BLOCK-----.*-----END PGP PRIVATE KEY BLOCK-----').Value
-          } elseif ($locationType -eq 'GCP') {
-            $gpgPrivateKey = (New-Object Net.WebClient).DownloadString('http://169.254.169.254/computeMetadata/v1beta1/instance/attributes/pgpKey')
-          }
+          $gpgPrivateKey = [regex]::matches((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/user-data'), '(?s)-----BEGIN PGP PRIVATE KEY BLOCK-----.*-----END PGP PRIVATE KEY BLOCK-----').Value
         }
         catch {
           $gpgPrivateKey = $false
@@ -58,7 +54,7 @@ Configuration xDynamicConfig {
     DestinationPath = ('{0}\builds' -f $env:SystemDrive)
     Ensure = 'Present'
   }
-  if ($locationType -ne 'DataCenter') { 
+  if ($locationType -eq 'AWS') {
     Script FirefoxBuildSecrets {
       DependsOn = @('[Script]GpgKeyImport', '[File]BuildsFolder')
       GetScript = "@{ Script = FirefoxBuildSecrets }"
