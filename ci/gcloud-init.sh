@@ -6,7 +6,7 @@ names_first=(`jq -r '.unicorn.first[]' ${script_dir}/names.json`)
 names_middle=(`jq -r '.unicorn.middle[]' ${script_dir}/names.json`)
 names_last=(`jq -r '.unicorn.last[]' ${script_dir}/names.json`)
 
-zone_uri_list=(`gcloud compute zones list --uri --filter="name~'^(us|europe)-.*$'"`)
+zone_uri_list=(`gcloud compute zones list --uri --filter="name~'^(asia|australia|southamerica|northamerica)-.*$'"`)
 zone_name_list=("${zone_uri_list[@]##*/}")
 zone_name_list_shuffled=( $(shuf -e "${zone_name_list[@]}") )
 
@@ -46,7 +46,7 @@ for zone_name in ${zone_name_list[@]}; do
     --image-project windows-cloud \
     --image-family windows-2012-r2 \
     --machine-type ${instanceType} \
-    --boot-disk-size 120 \
+    --boot-disk-size 50 \
     --boot-disk-type pd-ssd \
     --scopes storage-ro \
     --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=gecko-1-b-win2012-gamma;sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt};relengapiToken=${relengapiToken};occInstallersToken=${occInstallersToken}" \

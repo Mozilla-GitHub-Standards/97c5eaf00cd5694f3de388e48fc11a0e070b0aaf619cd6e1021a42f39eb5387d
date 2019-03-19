@@ -1531,56 +1531,12 @@ function Set-DomainName {
     Write-Log -message ('{0} :: begin - {1:o}' -f $($MyInvocation.MyCommand.Name), (Get-Date).ToUniversalTime()) -severity 'DEBUG'
   }
   process {
-    switch -wildcard ($az) {
-      # EC2
-      'eu-central-1*'{
-        $dnsRegion = 'euc1'
+    switch ($locationType) {
+      'EC2'{
+        $dnsRegion = $az.Replace('-', '').Replace('central', 'c').Replace('east', 'e').Replace('west', 'w').SubString(0,4)
       }
-      'us-east-1*'{
-        $dnsRegion = 'use1'
-      }
-      'us-east-2*'{
-        $dnsRegion = 'use2'
-      }
-      'us-west-1*'{
-        $dnsRegion = 'usw1'
-      }
-      'us-west-2*'{
-        $dnsRegion = 'usw2'
-      }
-      # GCP
-      'us-central1-*'{
-        $dnsRegion = 'usc1'
-      }
-      'us-east1-*'{
-        $dnsRegion = 'use1'
-      }
-      'us-east4-*'{
-        $dnsRegion = 'use4'
-      }
-      'us-west1-*'{
-        $dnsRegion = 'usw1'
-      }
-      'us-west2-*'{
-        $dnsRegion = 'usw2'
-      }
-      'europe-north1-*'{
-        $dnsRegion = 'eun1'
-      }
-      'europe-west1-*'{
-        $dnsRegion = 'euw1'
-      }
-      'europe-west2-*'{
-        $dnsRegion = 'euw2'
-      }
-      'europe-west3-*'{
-        $dnsRegion = 'euw3'
-      }
-      'europe-west4-*'{
-        $dnsRegion = 'euw4'
-      }
-      'europe-west6-*'{
-        $dnsRegion = 'euw6'
+      'GCP'{
+        $dnsRegion = ($az -replace ".{2}$").Replace('-', '').Replace('asia', 'a').Replace('australia', 'au').Replace('southamerica', 'sa').Replace('northamerica', 'na').Replace('europe', 'eu').Replace('central', 'c').Replace('east', 'e').Replace('west', 'w').Replace('south', 's').Replace('north', 'n')
       }
       default {
         $dnsRegion = $az
