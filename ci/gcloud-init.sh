@@ -8,7 +8,6 @@ names_last=(`jq -r '.unicorn.last[]' ${script_dir}/names.json`)
 
 zone_uri_list=(`gcloud compute zones list --uri`)
 zone_name_list=("${zone_uri_list[@]##*/}")
-zone_name_list_shuffled=( $(shuf -e "${zone_name_list[@]}") )
 
 accessToken=`pass Mozilla/TaskCluster/project/releng/generic-worker/gecko-1-b-win2012-gamma/production`
 livelogSecret=`pass Mozilla/TaskCluster/livelogSecret`
@@ -22,7 +21,7 @@ GITHUB_HEAD_SHA=`git rev-parse HEAD`
 deploymentId=${GITHUB_HEAD_SHA:0:12}
 
 #instanceType=n1-standard-8
-instanceType=n1-highcpu-32
+instanceType=n1-highcpu-96
 
 if which xdg-open > /dev/null; then
   xdg-open "https://console.cloud.google.com/compute/instances?authuser=1&folder&organizationId&project=windows-workers&instancessize=50&duration=PT1H&pli=1&instancessort=zoneForFilter%252Cname"
@@ -30,7 +29,10 @@ fi
 
 echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deployment id: $(tput bold)${deploymentId}$(tput sgr0)"
 
-for zone_name in ${zone_name_list[@]}; do
+# spawn 5 instances
+for i in {1..5}; do
+  # pick a random zone
+  zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
   # generate a random instance name which does not pre-exist
   existing_instance_uri_list=(`gcloud compute instances list --uri`)
   existing_instance_name_list=("${existing_instance_uri_list[@]##*/}")
