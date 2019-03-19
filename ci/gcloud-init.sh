@@ -37,7 +37,9 @@ for i in {1..5}; do
   cpuQuota=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
   cpuUsage=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
   while (( (cpuQuota - cpuUsage) < instanceCpuCount )); do
+    echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")] skipping region: ${region} (cpu quota: ${cpuQuota}, cpu usage: ${cpuUsage})$(tput sgr0)"
     zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
+    region=${zone_name::-2}
     cpuQuota=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").limit')
     cpuUsage=$(gcloud compute regions describe ${region} --project windows-workers --format json | jq '.quotas[] | select(.metric == "CPUS").usage')
   done
