@@ -31,7 +31,7 @@ echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deploy
 
 # spawn some instances
 # todo: determine the number of instances to spawn by checking the pending count for the worker type
-for i in {1..2}; do
+for i in {1..6}; do
   # pick a random zone that has region cpu quota (minus usage) higher than required instanceCpuCount
   zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
   region=${zone_name::-2}
