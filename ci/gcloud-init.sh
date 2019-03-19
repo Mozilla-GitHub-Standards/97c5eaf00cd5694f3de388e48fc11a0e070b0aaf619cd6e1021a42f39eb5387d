@@ -6,7 +6,7 @@ names_first=(`jq -r '.unicorn.first[]' ${script_dir}/names.json`)
 names_middle=(`jq -r '.unicorn.middle[]' ${script_dir}/names.json`)
 names_last=(`jq -r '.unicorn.last[]' ${script_dir}/names.json`)
 
-zone_uri_list=(`gcloud compute zones list --uri --filter="name~'^(asia|australia|southamerica|northamerica)-.*$'"`)
+zone_uri_list=(`gcloud compute zones list --uri`)
 zone_name_list=("${zone_uri_list[@]##*/}")
 zone_name_list_shuffled=( $(shuf -e "${zone_name_list[@]}") )
 
@@ -18,10 +18,11 @@ pgpKey=`pass Mozilla/OpenCloudConfig/rootGpgKey`
 relengapiToken=`pass Mozilla/OpenCloudConfig/tooltool-relengapi-tok`
 occInstallersToken=`pass Mozilla/OpenCloudConfig/tooltool-occ-installers-tok`
 provisionerId=releng-hardware
-workerGroup=gcp
 GITHUB_HEAD_SHA=`git rev-parse HEAD`
 deploymentId=${GITHUB_HEAD_SHA:0:12}
-instanceType=n1-standard-8
+
+#instanceType=n1-standard-8
+instanceType=n1-highcpu-32
 
 if which xdg-open > /dev/null; then
   xdg-open "https://console.cloud.google.com/compute/instances?authuser=1&folder&organizationId&project=windows-workers&instancessize=50&duration=PT1H&pli=1&instancessort=zoneForFilter%252Cname"
@@ -37,10 +38,12 @@ for zone_name in ${zone_name_list[@]}; do
   while [[ " ${existing_instance_name_list[@]} " =~ " ${instance_name} " ]]; do
     instance_name=${names_first[$[$RANDOM % ${#names_first[@]}]]}-${names_middle[$[$RANDOM % ${#names_middle[@]}]]}-${names_last[$[$RANDOM % ${#names_last[@]}]]}
   done
+  workerGroup=${zone_name::-2}
 
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance name: $(tput bold)${instance_name}$(tput sgr0)"
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) zone name: $(tput bold)${zone_name}$(tput sgr0)"
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance type: $(tput bold)${instanceType}$(tput sgr0)"
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) worker group: $(tput bold)${workerGroup}$(tput sgr0)"
 
   gcloud compute instances create ${instance_name} \
     --image-project windows-cloud \
