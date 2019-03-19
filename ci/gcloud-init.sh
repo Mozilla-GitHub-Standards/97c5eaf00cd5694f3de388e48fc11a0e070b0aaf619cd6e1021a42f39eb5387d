@@ -9,11 +9,11 @@ zone_uri_list=(`gcloud compute zones list --uri --filter="name~'^(us|europe)-.*$
 zone_name_list=("${zone_uri_list[@]##*/}")
 zone_name_list_shuffled=( $(shuf -e "${zone_name_list[@]}") )
 
-accessToken=`cat ~/.accessToken`
-livelogSecret=`cat ~/.livelogSecret`
-livelogcrt=`cat ~/.livelog.crt`
-livelogkey=`cat ~/.livelog.key`
-pgpKey=`cat ~/.ssh/occ-secrets-private.key`
+accessToken=`pass Mozilla/TaskCluster/project/releng/generic-worker/gecko-1-b-win2012-gamma/production`
+livelogSecret=`pass Mozilla/TaskCluster/livelogSecret`
+livelogcrt=`pass Mozilla/TaskCluster/livelogCert`
+livelogkey=`pass Mozilla/TaskCluster/livelogKey`
+pgpKey=`pass Mozilla/OpenCloudConfig/rootGpgKey`
 
 for zone_name in ${zone_name_list[@]}; do
   # generate a random instance name which does not pre-exist
