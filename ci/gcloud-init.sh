@@ -20,7 +20,7 @@ provisionerId=releng-hardware
 GITHUB_HEAD_SHA=`git rev-parse HEAD`
 deploymentId=${GITHUB_HEAD_SHA:0:12}
 
-instanceCpuCount=96
+instanceCpuCount=32
 instanceType=n1-highcpu-${instanceCpuCount}
 
 if which xdg-open > /dev/null; then
