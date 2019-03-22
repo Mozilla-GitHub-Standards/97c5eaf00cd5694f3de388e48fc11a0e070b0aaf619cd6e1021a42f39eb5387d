@@ -9,7 +9,9 @@ names_last=(`jq -r '.unicorn.last[]' ${script_dir}/names.json`)
 zone_uri_list=(`gcloud compute zones list --uri`)
 zone_name_list=("${zone_uri_list[@]##*/}")
 
-accessToken=`pass Mozilla/TaskCluster/project/releng/generic-worker/gecko-1-b-win2012-gamma/production`
+workerType=gecko-1-b-win2012-gamma
+
+accessToken=`pass Mozilla/TaskCluster/project/releng/generic-worker/${workerType}/production`
 livelogSecret=`pass Mozilla/TaskCluster/livelogSecret`
 livelogcrt=`pass Mozilla/TaskCluster/livelogCert`
 livelogkey=`pass Mozilla/TaskCluster/livelogKey`
@@ -29,9 +31,11 @@ fi
 
 echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deployment id: $(tput bold)${deploymentId}$(tput sgr0)"
 
+# determine the number of instances to spawn by checking the pending count for the worker type
+pendingTaskCount=$(curl -s https://queue.taskcluster.net/v1/pending/${provisionerId}/${workerType} | jq '.pendingTasks')
+echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) pending tasks: $(tput bold)${pendingTaskCount}$(tput sgr0)"
 # spawn some instances
-# todo: determine the number of instances to spawn by checking the pending count for the worker type
-for i in {1..6}; do
+for i in $(seq 1 ${pendingTaskCount}); do
   # pick a random zone that has region cpu quota (minus usage) higher than required instanceCpuCount
   zone_name=${zone_name_list[$[$RANDOM % ${#zone_name_list[@]}]]}
   region=${zone_name::-2}
@@ -64,13 +68,13 @@ for i in {1..6}; do
     --boot-disk-size 50 \
     --boot-disk-type pd-ssd \
     --scopes storage-ro \
-    --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=gecko-1-b-win2012-gamma;sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt};relengapiToken=${relengapiToken};occInstallersToken=${occInstallersToken}" \
+    --metadata "^;^windows-startup-script-url=gs://open-cloud-config/gcloud-startup.ps1;workerType=${workerType};sourceOrg=mozilla-releng;sourceRepo=OpenCloudConfig;sourceRevision=gamma;pgpKey=${pgpKey};livelogkey=${livelogkey};livelogcrt=${livelogcrt};relengapiToken=${relengapiToken};occInstallersToken=${occInstallersToken}" \
     --zone ${zone_name}
   publicIP=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.networkInterfaces[0].accessConfigs[0].natIP')
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) public ip: $(tput bold)${publicIP}$(tput sgr0)"
   instanceId=$(gcloud compute instances describe ${instance_name} --zone ${zone_name} --format json | jq -r '.id')
   echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) instance id: $(tput bold)${instanceId}$(tput sgr0)"
-  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/gecko-1-b-win2012-gamma.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${region} --arg deploymentId ${deploymentId} --arg availabilityZone ${zone_name} --arg instanceId ${instanceId} --arg instanceType ${instanceType} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
+  gwConfig="`curl -s https://raw.githubusercontent.com/mozilla-releng/OpenCloudConfig/gamma/userdata/Manifest/${workerType}.json | jq --arg accessToken ${accessToken} --arg livelogSecret ${livelogSecret} --arg publicIP ${publicIP} --arg workerId ${instance_name} --arg provisionerId ${provisionerId} --arg workerGroup ${region} --arg deploymentId ${deploymentId} --arg availabilityZone ${zone_name} --arg instanceId ${instanceId} --arg instanceType ${instanceType} -c '.ProvisionerConfiguration.userData.genericWorker.config | .accessToken = $accessToken | .livelogSecret = $livelogSecret | .publicIP = $publicIP | .workerId = $workerId | .provisionerId = $provisionerId | .workerGroup = $workerGroup | .deploymentId = $deploymentId' | sed 's/\"/\\\"/g'`"
   gcloud compute instances add-metadata ${instance_name} --zone ${zone_name} --metadata "^;^gwConfig=${gwConfig}"
   gcloud beta compute disks create ${instance_name}-disk-1 --size 120 --type pd-ssd --physical-block-size 4096 --zone ${zone_name}
   gcloud compute instances attach-disk ${instance_name} --disk ${instance_name}-disk-1 --zone ${zone_name}
