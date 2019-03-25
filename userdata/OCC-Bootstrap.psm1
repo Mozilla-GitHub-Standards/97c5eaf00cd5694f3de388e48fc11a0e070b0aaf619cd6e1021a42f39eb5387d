@@ -2099,7 +2099,7 @@ function Invoke-OpenCloudConfig {
           $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/instance-type'))
         }
         'GCP' {
-          $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/computeMetadata/v1beta1/instance/machine-type'))
+          $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/computeMetadata/v1beta1/instance/machine-type') -replace '.*\/')
         }
         # todo: implement instance type discovery for non AWS/GCP
       }
