@@ -31,8 +31,17 @@ fi
 
 echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deployment id: $(tput bold)${deploymentId}$(tput sgr0)"
 
+# delete instances that are not working
+for instance in $(curl -s "https://queue.taskcluster.net/v1/provisioners/${provisionerId}/worker-types/${workerType}/workers" | jq '.workers[] | select(.latestTask == null) | @base64'); do
+  _jq() {
+    echo ${instance} | base64 --decode | jq -r ${1}
+  }
+  gcloud compute instances delete $(_jq '.workerId') --zone $(_jq '.workerGroup') --delete-disks all
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deleted: $(tput bold)$(_jq '.workerGroup')/$(_jq '.workerId')$(tput sgr0)"
+done
+
 # determine the number of instances to spawn by checking the pending count for the worker type
-pendingTaskCount=$(curl -s https://queue.taskcluster.net/v1/pending/${provisionerId}/${workerType} | jq '.pendingTasks')
+pendingTaskCount=$(curl -s "https://queue.taskcluster.net/v1/pending/${provisionerId}/${workerType}" | jq '.pendingTasks')
 echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) pending tasks: $(tput bold)${pendingTaskCount}$(tput sgr0)"
 # spawn some instances
 for i in $(seq 1 ${pendingTaskCount}); do
