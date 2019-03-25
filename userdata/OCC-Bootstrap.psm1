@@ -2093,9 +2093,22 @@ function Invoke-OpenCloudConfig {
         }
       }
       Write-Log -message ('{0} :: runDscOnWorker: {1}' -f $($MyInvocation.MyCommand.Name), $runDscOnWorker) -severity 'DEBUG'
-      $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/instance-type'))
-      Write-Log -message ('{0} :: instanceType: {1}.' -f $($MyInvocation.MyCommand.Name), $instanceType) -severity 'INFO'
-      [Environment]::SetEnvironmentVariable("TASKCLUSTER_INSTANCE_TYPE", "$instanceType", "Machine")
+
+      switch ($locationType) {
+        'AWS' {
+          $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/instance-type'))
+        }
+        'GCP' {
+          $instanceType = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/computeMetadata/v1beta1/instance/machine-type'))
+        }
+        # todo: implement instance type discovery for non AWS/GCP
+      }
+      if ($instanceType) {
+        Write-Log -message ('{0} :: instanceType: {1}' -f $($MyInvocation.MyCommand.Name), $instanceType) -severity 'INFO'
+        [Environment]::SetEnvironmentVariable('TASKCLUSTER_INSTANCE_TYPE', $instanceType, 'Machine')
+      } else {
+        Write-Log -message ('{0} :: failed to determine instanceType' -f $($MyInvocation.MyCommand.Name)) -severity 'WARN'
+      }
 
       # workaround for windows update failures on g3 instances
       # https://support.microsoft.com/en-us/help/10164/fix-windows-update-errors
