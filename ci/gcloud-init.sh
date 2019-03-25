@@ -32,12 +32,13 @@ fi
 echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deployment id: $(tput bold)${deploymentId}$(tput sgr0)"
 
 # delete instances that are not working
-for instance in $(curl -s "https://queue.taskcluster.net/v1/provisioners/${provisionerId}/worker-types/${workerType}/workers" | jq '.workers[] | select(.latestTask == null) | @base64'); do
+for instance in $(curl -s "https://queue.taskcluster.net/v1/provisioners/${provisionerId}/worker-types/${workerType}/workers" | jq -r '.workers[] | select(.latestTask == null) | @base64'); do
   _jq() {
     echo ${instance} | base64 --decode | jq -r ${1}
   }
-  gcloud compute instances delete $(_jq '.workerId') --zone $(_jq '.workerGroup') --delete-disks all
-  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deleted: $(tput bold)$(_jq '.workerGroup')/$(_jq '.workerId')$(tput sgr0)"
+  # todo: figure out zone (we only know region)
+  #gcloud compute instances delete $(_jq '.workerId') --zone $(_jq '.workerGroup') --delete-disks all
+  echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) not deleted: $(tput bold)$(_jq '.workerGroup')/$(_jq '.workerId')$(tput sgr0)"
 done
 
 # determine the number of instances to spawn by checking the pending count for the worker type
