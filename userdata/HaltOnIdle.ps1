@@ -128,7 +128,9 @@ function Is-RdpSessionActive {
   return (Is-ConditionTrue -proc 'remote desktop session' -predicate (@(Get-Process | ? { $_.ProcessName -eq 'rdpclip' }).length -gt 0) -activity 'active' -falseSeverity 'DEBUG')
 }
 
-if (Is-Terminating) {
+$locationType = $(if ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue)) { 'AWS' } elseif (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue) { 'GCP' } else { 'DataCenter' })
+
+if (Is-Terminating -locationType $locationType) {
   exit
 }
 if (Test-Path -Path 'Z:\' -ErrorAction SilentlyContinue) {
@@ -138,16 +140,21 @@ if (Test-Path -Path 'Z:\' -ErrorAction SilentlyContinue) {
 }
 
 # prevent HaltOnIdle running before host rename has occured.
-$instanceId = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/instance-id'))
-$dnsHostname = ([System.Net.Dns]::GetHostName())
-if ($instanceId -ne $dnsHostname) {
-  Write-Log -message ('productivity checks skipped. instance id: {0} does not match hostname: {1}.' -f $instanceId, $dnsHostname) -severity 'DEBUG'
-  exit
-}
-$publicKeys = (New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/public-keys')
-if ($publicKeys.StartsWith('0=mozilla-taskcluster-worker-')) {
-  Write-Log -message 'productivity checks skipped. ami creation instance detected.' -severity 'DEBUG'
-  exit
+
+switch ($locationType) {
+  'EC2'{
+    $instanceId = ((New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/instance-id'))
+    $dnsHostname = ([System.Net.Dns]::GetHostName())
+    if ($instanceId -ne $dnsHostname) {
+      Write-Log -message ('productivity checks skipped. instance id: {0} does not match hostname: {1}.' -f $instanceId, $dnsHostname) -severity 'DEBUG'
+      exit
+    }
+    $publicKeys = (New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/public-keys')
+    if ($publicKeys.StartsWith('0=mozilla-taskcluster-worker-')) {
+      Write-Log -message 'productivity checks skipped. ami creation instance detected.' -severity 'DEBUG'
+      exit
+    }
+  }
 }
 
 if (-not (Is-GenericWorkerRunning)) {
