@@ -11,7 +11,7 @@ function Write-Log {
     [string] $source = 'HaltOnIdle',
     [string] $logName = 'Application'
   )
-  if (!([Diagnostics.EventLog]::Exists($logName)) -or !([Diagnostics.EventLog]::SourceExists($source))) {
+  if ((Get-Command 'New-EventLog' -ErrorAction 'SilentlyContinue') -and (!([Diagnostics.EventLog]::Exists($logName)) -or !([Diagnostics.EventLog]::SourceExists($source)))) {
     New-EventLog -LogName $logName -Source $source
   }
   switch ($severity) {
@@ -36,11 +36,15 @@ function Write-Log {
       break
     }
   }
-  Write-EventLog -LogName $logName -Source $source -EntryType $entryType -Category 0 -EventID $eventId -Message $message
+  if (Get-Command 'Write-EventLog' -ErrorAction 'SilentlyContinue') {
+    Write-EventLog -LogName $logName -Source $source -EntryType $entryType -Category 0 -EventID $eventId -Message $message
+  } else {
+    Write-Verbose -Message $message
+  }
 }
 
 function Get-Uptime {
-  if ($lastBoot = (Get-WmiObject win32_operatingsystem | select @{LABEL='LastBootUpTime';EXPRESSION={$_.ConverttoDateTime($_.lastbootuptime)}}).LastBootUpTime) {
+  if ((Get-Command 'Get-WmiObject' -ErrorAction 'SilentlyContinue') -and ($lastBoot = (Get-WmiObject win32_operatingsystem | select @{LABEL='LastBootUpTime';EXPRESSION={$_.ConverttoDateTime($_.lastbootuptime)}}).LastBootUpTime)) {
     $uptime = ((Get-Date) - $lastBoot)
     Write-Log -message ('{0} :: last boot: {1}; uptime: {2:c}.' -f $($MyInvocation.MyCommand.Name), $lastBoot, $uptime) -severity 'INFO'
     return $uptime
@@ -68,7 +72,7 @@ function Is-ConditionTrue {
 
 function Is-Terminating {
   param (
-    [string] $locationType = $(if ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue)) { 'AWS' } elseif (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue) { 'GCP' } else { 'DataCenter' })
+    [string] $locationType = $(if ((Get-Command 'Get-Service' -ErrorAction 'SilentlyContinue') -and ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue))) { 'AWS' } elseif ((Get-Command 'Get-Service' -ErrorAction 'SilentlyContinue') -and (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue)) { 'GCP' } else { 'DataCenter' })
   )
   begin {
     Write-Log -message ('{0} :: begin - {1:o}' -f $($MyInvocation.MyCommand.Name), (Get-Date).ToUniversalTime()) -severity 'DEBUG'
@@ -130,7 +134,7 @@ function Is-RdpSessionActive {
 
 function Test-InstanceProductivity {
   param (
-    [string] $locationType = $(if ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue)) { 'AWS' } elseif (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue) { 'GCP' } else { 'DataCenter' })
+    [string] $locationType = $(if ((Get-Command 'Get-Service' -ErrorAction 'SilentlyContinue') -and ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue))) { 'AWS' } elseif ((Get-Command 'Get-Service' -ErrorAction 'SilentlyContinue') -and (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue)) { 'GCP' } else { 'DataCenter' })
   )
   begin {
     Write-Log -message ('{0} :: begin - {1:o}' -f $($MyInvocation.MyCommand.Name), (Get-Date).ToUniversalTime()) -severity 'DEBUG'
