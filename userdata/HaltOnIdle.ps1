@@ -67,19 +67,47 @@ function Is-ConditionTrue {
 }
 
 function Is-Terminating {
-  try {
-    $response = (New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/spot/termination-time')
-    $result = (-not ($response.Contains('(404)')))
+  param (
+    [string] $locationType = $(if ((Get-Service 'Ec2Config' -ErrorAction SilentlyContinue) -or (Get-Service 'AmazonSSMAgent' -ErrorAction SilentlyContinue)) { 'AWS' } elseif (Get-Service 'GCEAgent' -ErrorAction SilentlyContinue) { 'GCP' } else { 'DataCenter' })
+  )
+  begin {
+    Write-Log -message ('{0} :: begin - {1:o}' -f $($MyInvocation.MyCommand.Name), (Get-Date).ToUniversalTime()) -severity 'DEBUG'
   }
-  catch {
-    $result = $false
+  process {
+    switch ($locationType) {
+      'EC2'{
+        try {
+          $response = (New-Object Net.WebClient).DownloadString('http://169.254.169.254/latest/meta-data/spot/termination-time')
+          $result = (-not ($response.Contains('(404)')))
+        }
+        catch {
+          $result = $false
+        }
+        if (($result) -and ($response)) {
+          Write-Log -message ('{0} :: spot termination notice received: {1}.' -f $($MyInvocation.MyCommand.Name), $response) -severity 'WARN'
+        } else {
+          #Write-Log -message ('{0} :: spot termination notice not detected.' -f $($MyInvocation.MyCommand.Name)) -severity 'DEBUG'
+        }
+        return [bool](($result) -and ($response))
+      }
+      'GCP'{
+        try {
+          $webClient = (New-Object -TypeName 'System.Net.WebClient')
+          $webClient.Headers.Add('Metadata-Flavor', 'Google')
+          $preempted = ($webClient.DownloadString('http://metadata.google.internal/computeMetadata/v1/instance/preempted', $localPath) -eq 'TRUE')
+        } catch {
+          $preempted = $false
+        }
+        return $preempted
+      }
+      default {
+        return $false
+      }
+    }
   }
-  if (($result) -and ($response)) {
-    Write-Log -message ('{0} :: spot termination notice received: {1}.' -f $($MyInvocation.MyCommand.Name), $response) -severity 'WARN'
-  } else {
-    #Write-Log -message ('{0} :: spot termination notice not detected.' -f $($MyInvocation.MyCommand.Name)) -severity 'DEBUG'
+  end {
+    Write-Log -message ('{0} :: end - {1:o}' -f $($MyInvocation.MyCommand.Name), (Get-Date).ToUniversalTime()) -severity 'DEBUG'
   }
-  return [bool](($result) -and ($response))
 }
 
 function Is-OpenCloudConfigRunning {
