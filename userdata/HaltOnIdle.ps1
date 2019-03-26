@@ -196,9 +196,3 @@ if (-not (Is-GenericWorkerRunning)) {
     Write-Log -message ('process priority for generic worker altered from {0} to {1}.' -f $priorityClass, $gwProcess.PriorityClass) -severity 'INFO'
   }
 }
-if (Test-Path -Path 'y:\' -ErrorAction SilentlyContinue) {
-  if (-not (Test-Path -Path 'y:\hg-shared' -ErrorAction SilentlyContinue)) {
-    New-Item -Path 'y:\hg-shared' -ItemType directory -force
-  }
-  & icacls @('y:\hg-shared', '/grant', 'Everyone:(OI)(CI)F')
-}
