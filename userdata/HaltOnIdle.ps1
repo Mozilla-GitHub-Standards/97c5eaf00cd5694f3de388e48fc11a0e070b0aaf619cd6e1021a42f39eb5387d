@@ -140,7 +140,7 @@ function Test-InstanceProductivity {
       exit
     }
     # log the presence or absence of the Z: & Y: drives
-    for ($drive in @('Y', 'Z')) {
+    foreach ($drive in @('Y', 'Z')) {
       Is-ConditionTrue -proc ('drive {0}:' -f $drive) -activity 'detected' -predicate (Test-Path -Path ('{0}:\' -f $drive) -ErrorAction SilentlyContinue)
     }
     switch ($locationType) {
