@@ -91,7 +91,17 @@ for manifest in $(ls ${script_dir}/../userdata/Manifest/*-gamma.json); do
       gcloud compute instances attach-disk ${instance_name} --disk ${instance_name}-disk-1 --zone ${zone_name}
     done
   else
-    ${script_dir}/gcloud-kill-idle.sh
+    # delete instances that have never taken a task
+    for instance in $(curl -s "https://queue.taskcluster.net/v1/provisioners/${provisionerId}/worker-types/${workerType}/workers" | jq -r '.workers[] | select(.latestTask == null) | @base64'); do
+      _jq() {
+        echo ${instance} | base64 --decode | jq -r ${1}
+      }
+      zoneUrl=$(gcloud compute instances list --filter="name:$(_jq '.workerId') AND zone~$(_jq '.workerGroup')" --format=json | jq -r '.[0].zone')
+      zone=${zoneUrl##*/}
+      if [ -n "${zoneUrl}" ] && [ -n "${zone}" ] && [[ "${zone}" != "null" ]] && gcloud compute instances delete $(_jq '.workerId') --zone ${zone} --delete-disks all --quiet; then
+        echo "$(tput dim)[${script_name} $(date --utc +"%F %T.%3NZ")]$(tput sgr0) deleted: $(tput bold)${zone}/$(_jq '.workerId')$(tput sgr0)"
+      fi
+    done
   fi
 done
 
