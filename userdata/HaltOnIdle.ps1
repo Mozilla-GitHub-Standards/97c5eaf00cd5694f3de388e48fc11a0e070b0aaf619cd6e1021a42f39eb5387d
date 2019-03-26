@@ -98,6 +98,11 @@ function Is-Terminating {
         } catch {
           $preempted = $false
         }
+        if ($preempted) {
+          Write-Log -message ('{0} :: gcp preemption notice received: {1}.' -f $($MyInvocation.MyCommand.Name), $response) -severity 'WARN'
+        } else {
+          #Write-Log -message ('{0} :: gcp preemption notice not detected.' -f $($MyInvocation.MyCommand.Name)) -severity 'DEBUG'
+        }
         return $preempted
       }
       default {
