@@ -25,7 +25,7 @@ deploymentId=${GITHUB_HEAD_SHA:0:12}
 instanceCpuCount=32
 instanceType=n1-highcpu-${instanceCpuCount}
 
-if which xdg-open > /dev/null; then
+if [[ "$1" == "--open-in-browser" ]] && which xdg-open > /dev/null; then
   xdg-open "https://console.cloud.google.com/compute/instances?authuser=1&folder&organizationId&project=windows-workers&instancessize=50&duration=PT1H&pli=1&instancessort=zoneForFilter%252Cname"
 fi
 
